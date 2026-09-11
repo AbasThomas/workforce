@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkerStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum MessageRole {
+  USER
+  WORKER
+  SYSTEM
+}
+
+enum ActivityType {
+  WORKER_CREATED
+  WORKER_UPDATED
+  WORKER_ACTIVATED
+  WORKER_PAUSED
+  WORKER_ARCHIVED
+  KNOWLEDGE_ADDED
+  KNOWLEDGE_UPDATED
+  KNOWLEDGE_DELETED
+  CONVERSATION_STARTED
+  MESSAGE_RECEIVED
+  MESSAGE_SENT
+  WORKER_GENERATED
+  WORKFORCE_ANALYZED
+  ESCALATION
+  ERROR
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  passwordHash  String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  workspaces    Workspace[]
+  conversations Conversation[]
+}
+
+model Workspace {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  workers     Worker[]
+
+  @@index([ownerId])
+}
+
+model Worker {
+  id               String       @id @default(cuid())
+  workspaceId      String
+  name             String
+  role             String
+  description      String
+  instructions     String
+  responsibilities String[]
+  skills           String[]
+  status           WorkerStatus @default(DRAFT)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  workspace        Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  knowledge        Knowledge[]
+  conversations    Conversation[]
+  activities       Activity[]
+
+  @@index([workspaceId, status])
+}
+
+model Knowledge {
+  id        String   @id @default(cuid())
+  workerId  String
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@index([workerId])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  workerId  String
+  userId    String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  worker    Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
+
+  @@index([workerId, userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  role           MessageRole
+  content        String
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+model Activity {
+  id          String       @id @default(cuid())
+  workerId    String
+  type        ActivityType
+  title       String
+  description String?
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+  worker      Worker       @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@index([workerId, createdAt])
+}
